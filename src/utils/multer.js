@@ -5,7 +5,7 @@ export const fileStorageCourse = multer.diskStorage({
         cb(null, 'public/uploads/courses');
     },
     filename: (req, file, cb) => {
-        const ext = file.originalname.split('.').pop();
+        const ext = file.originalname.split('.')[1];
         const uniqId = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
         cb(null, `${file.fieldname}-${uniqId}.${ext}`);
     },
