@@ -4,6 +4,7 @@ import categoryModel from '../models/categoryModel.js';
 import userModel from '../models/userModel.js';
 import { mutateCourseSchema } from '../utils/schema.js';
 import path from 'path';
+import courseDetailModel from '../models/courseDetailModel.js';
 
 export const getCourses = async (req, res) => {
     try {
@@ -61,8 +62,18 @@ export const getCategories = async (req, res) => {
 export const getCourseById = async (req, res) => {
     try {
         const { id } = req.params;
+        const { preview } = req.query
 
-        const course = await courseModel.findById(id);
+        const course = await courseModel
+            .findById(id)
+            .populate({
+                path: 'category',
+                select: 'name -_id'
+            })
+            .populate({
+                path: 'details',
+                select: preview === "true" ? 'title type youtubeId text' : 'title type'
+            })
 
         if (!course) {
             return res.status(404).json({
@@ -81,8 +92,6 @@ export const getCourseById = async (req, res) => {
         });
     }
 };
-
-
 
 export const postCourse = async (req, res) => {
     try {
@@ -251,3 +260,91 @@ export const deleteCourse = async (req, res) => {
         });
     }
 };
+
+export const postContentCourse = async (req, res) => {
+    try {
+        const body = req.body;
+
+        // Find the course by ID
+        const course = await courseModel.findById(body.courseId);
+
+        // Create a new course detail (content)
+        const content = new courseDetailModel({
+            title: body.title,
+            type: body.type,
+            course: course._id,
+            text: body.text,
+            youtubeId: body.youtubeId,
+        });
+
+        await content.save();
+
+        // Update the course model with the new content details
+        await courseModel.findByIdAndUpdate(course._id, {
+            $push: {
+                details: content._id,
+            },
+        }, { new: true });
+
+        return res.json({
+            message: 'Create Content Success',
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: 'Internal server error',
+        });
+    }
+};
+
+export const updateContentCourse = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const body = req.body;
+
+        // Find the related course by courseId from the request body
+        const course = await courseModel.findById(body.courseId);
+        if (!course) {
+            return res.status(404).json({
+                message: 'Course not found',
+            });
+        }
+
+        // Update the course detail content using the provided ID
+        await courseDetailModel.findByIdAndUpdate(id, {
+            title: body.title,
+            type: body.type,
+            course: course._id,
+            text: body.text,
+            youtubeId: body.youtubeId,
+        }, { new: true });
+
+        return res.json({
+            message: 'Update Content Success',
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: 'Internal server error',
+        });
+    }
+};
+
+
+export const deleteContentCourse = async (req, res) => {
+    try {
+        const { id } = req.params
+
+        await courseDetailModel.findByIdAndDelete(id)
+
+        return res.json({
+            message: 'Delete Content Success'
+        })
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: 'Internal server error',
+        });
+
+    }
+}
