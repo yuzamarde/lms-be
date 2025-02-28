@@ -81,9 +81,14 @@ export const getCourseById = async (req, res) => {
             });
         }
 
+        const imageUrl = process.env.APP_URL + '/uploads/courses/'
+
         return res.json({
             message: 'Get Course Detail success',
-            data: course,
+            data: {
+                ...course.toObject(),
+                thumbnail_url: imageUrl + course.thumbnail
+            }
         });
     } catch (error) {
         console.log(error);
@@ -348,3 +353,26 @@ export const deleteContentCourse = async (req, res) => {
 
     }
 }
+export const getDetailContent = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const content = await courseDetailModel.findById(id);
+        if (!content) {
+            return res.status(404).json({
+                message: 'Content not found',
+            });
+        }
+
+        return res.json({
+            message: 'Get Detail Content success',
+            data: content,
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: 'Internal server error',
+        });
+    }
+};
+
