@@ -7,6 +7,7 @@ import authRoutes from './routes/authRoutes.js';
 import connectDB from './utils/database.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import courseRoutes from './routes/courseRoutes.js';
+import studentRoutes from './routes/studentRoutes.js';
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use("/api", globalRoutes)
 app.use("/api", paymentRoutes)
 app.use("/api", authRoutes)
 app.use("/api", courseRoutes)
+app.use("/api", studentRoutes)
 
 app.listen(port, () => {
     console.log(`Express App listening on port ${port}`);
