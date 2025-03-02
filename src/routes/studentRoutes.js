@@ -1,5 +1,5 @@
 import express from "express"
-import { deleteStudent, getStudentById, getStudents, postStudent, updateStudent } from "../controllers/studentController.js"
+import { deleteStudent, getCoursesStudent, getStudentById, getStudents, postStudent, updateStudent } from "../controllers/studentController.js"
 import { verifyToken } from "../middlewares/verifyToken.js"
 import multer from "multer"
 import { fileStorage, fileFilter } from "../utils/multer.js"
@@ -16,5 +16,7 @@ studentRoutes.get('/students/:id', verifyToken, getStudentById)
 studentRoutes.post('/students', verifyToken, upload.single('avatar'), postStudent)
 studentRoutes.put('/students/:id', verifyToken, upload.single('avatar'), updateStudent)
 studentRoutes.delete('/students/:id', verifyToken, deleteStudent)
+
+studentRoutes.get('/students-courses', verifyToken, getCoursesStudent)
 
 export default studentRoutes
