@@ -8,7 +8,7 @@ import connectDB from './utils/database.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import courseRoutes from './routes/courseRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
-import overviewRoutes from './models/overviewRoutes.js';
+import overviewRoutes from './routes/overviewRoutes.js';
 
 const app = express();
 
