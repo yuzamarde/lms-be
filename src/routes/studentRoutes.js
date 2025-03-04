@@ -1,22 +1,19 @@
-import express from "express"
-import { deleteStudent, getCoursesStudent, getStudentById, getStudents, postStudent, updateStudent } from "../controllers/studentController.js"
-import { verifyToken } from "../middlewares/verifyToken.js"
-import multer from "multer"
-import { fileStorage, fileFilter } from "../utils/multer.js"
+import express from "express";
+import {
+    deleteStudent, getCoursesStudent, getStudentById,
+    getStudents, postStudent, updateStudent
+} from "../controllers/studentController.js";
+import { verifyToken } from "../middlewares/verifyToken.js";
+import upload from "../utils/multer.js"; // Menggunakan Cloudinary
 
-const studentRoutes = express.Router()
+const studentRoutes = express.Router();
 
-const upload = multer({
-    storage: fileStorage('students'),
-    fileFilter
-})
+studentRoutes.get('/students', verifyToken, getStudents);
+studentRoutes.get('/students/:id', verifyToken, getStudentById);
+studentRoutes.post('/students', verifyToken, upload.single('avatar'), postStudent);
+studentRoutes.put('/students/:id', verifyToken, upload.single('avatar'), updateStudent);
+studentRoutes.delete('/students/:id', verifyToken, deleteStudent);
 
-studentRoutes.get('/students', verifyToken, getStudents)
-studentRoutes.get('/students/:id', verifyToken, getStudentById)
-studentRoutes.post('/students', verifyToken, upload.single('avatar'), postStudent)
-studentRoutes.put('/students/:id', verifyToken, upload.single('avatar'), updateStudent)
-studentRoutes.delete('/students/:id', verifyToken, deleteStudent)
+studentRoutes.get('/students-courses', verifyToken, getCoursesStudent);
 
-studentRoutes.get('/students-courses', verifyToken, getCoursesStudent)
-
-export default studentRoutes
+export default studentRoutes;

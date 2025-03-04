@@ -2,16 +2,13 @@ import express from "express"
 import { postCourse, getCourses, updateCourse, deleteCourse, getCategories, getCourseById, postContentCourse, updateContentCourse, deleteContentCourse, getDetailContent, getStudentsByCourseId, postStudentToCourse, deleteStudentToCourse } from "../controllers/courseController.js";
 import { verifyToken } from "../middlewares/verifyToken.js";
 import multer from "multer";
-import { fileFilter, fileStorageCourse } from "../utils/multer.js";
+import upload from "../utils/multer.js"; // Menggunakan Cloudinary
 import { addStudentCourseSchema, mutateContentSchema } from "../utils/schema.js";
 import { validateRequest } from "../middlewares/validateRequest.js";
 
 const courseRoutes = express.Router()
 
-const upload = multer({
-    storage: fileStorageCourse,
-    fileFilter
-})
+
 
 courseRoutes.get('/courses', verifyToken, getCourses)
 courseRoutes.get('/categories', verifyToken, getCategories)

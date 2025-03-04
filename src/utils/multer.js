@@ -1,37 +1,26 @@
 import multer from 'multer';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import cloudinary from './cloudinary.js';
 
-export const fileStorageCourse = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'public/uploads/courses');
-    },
-    filename: (req, file, cb) => {
-        const ext = file.originalname.split('.')[1];
-        const uniqId = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        cb(null, `${file.fieldname}-${uniqId}.${ext}`);
+// Konfigurasi penyimpanan di Cloudinary
+const storage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+        folder: 'courses', // Folder di Cloudinary
+        allowed_formats: ['jpg', 'png', 'jpeg'],
+        public_id: (req, file) => `course-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
     },
 });
 
-export const fileStorage = (path = 'courses') => multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, `public/uploads/${path}`)
-    },
-    filename: (req, file, cb) => {
-        const ext = file.originalname.split('.')[1];
-        const uniqId = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        cb(null, `${file.fieldname}-${uniqId}.${ext}`);
-    },
-});
-
-export const fileFilter = (req, file, cb) => {
-    if (
-        file.mimetype === 'image/jpeg' ||
-        file.mimetype === 'image/jpg' ||
-        file.mimetype === 'image/png'
-    ) {
+// Filter file hanya untuk gambar
+const fileFilter = (req, file, cb) => {
+    if (['image/jpeg', 'image/png', 'image/jpg'].includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(null, false);
+        cb(new Error('Invalid file type. Only JPEG, PNG, and JPG are allowed!'), false);
     }
 };
 
+const upload = multer({ storage, fileFilter });
 
+export default upload;

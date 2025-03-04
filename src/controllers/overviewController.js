@@ -3,52 +3,37 @@ import userModel from '../models/userModel.js';
 
 export const getOverviews = async (req, res) => {
     try {
-        const totalCourses = await courseModel
-            .find({ manager: req.user._id })
-            .countDocuments();
+        // Hitung total courses yang dimiliki oleh manager
+        const totalCourses = await courseModel.countDocuments({ manager: req.user._id });
 
-        const courses = await courseModel.find({
-            manager: req.user._id
-        })
+        // Ambil semua course milik manager
+        const courses = await courseModel.find({ manager: req.user._id });
 
-        const totalStudents = courses.reduce(
-            (acc, curr) => acc + curr.students.length,
-            0
-        )
+        // Hitung total students di semua course
+        const totalStudents = courses.reduce((acc, curr) => acc + curr.students.length, 0);
 
-        const coursesVideos = await courseModel.find({
-            manager: req.user._id
-        }).populate({
-            path: 'details',
-            select: 'name type',
-            match: {
-                type: 'video'
-            }
-        })
+        // Hitung jumlah videos di dalam courses
+        const coursesVideos = await courseModel.find({ manager: req.user._id })
+            .populate({
+                path: 'details',
+                select: 'name type',
+                match: { type: 'video' }
+            });
 
-        const totalVideos = coursesVideos.reduce(
-            (acc, curr) => acc + curr.details.length,
-            0
-        )
+        const totalVideos = coursesVideos.reduce((acc, curr) => acc + (curr.details?.length || 0), 0);
 
-        const coursesTexts = await courseModel.find({
-            manager: req.user._id
-        }).populate({
-            path: 'details',
-            select: 'name type',
-            match: {
-                type: 'text'
-            }
-        })
+        // Hitung jumlah texts di dalam courses
+        const coursesTexts = await courseModel.find({ manager: req.user._id })
+            .populate({
+                path: 'details',
+                select: 'name type',
+                match: { type: 'text' }
+            });
 
-        const totalTexts = coursesTexts.reduce(
-            (acc, curr) => acc + curr.details.length,
-            0
-        )
+        const totalTexts = coursesTexts.reduce((acc, curr) => acc + (curr.details?.length || 0), 0);
 
-        const coursesList = await courseModel.find({
-            manager: req.user?._id,
-        })
+        // Ambil daftar courses beserta kategori dan students
+        const coursesList = await courseModel.find({ manager: req.user?._id })
             .select('name thumbnail')
             .populate({
                 path: 'category',
@@ -59,31 +44,22 @@ export const getOverviews = async (req, res) => {
                 select: 'name',
             });
 
-        const imageUrl = process.env.APP_URL + '/uploads/courses/'
+        // Ambil daftar students yang memiliki manager terkait
+        const students = await userModel.find({ role: 'student', manager: req.user._id })
+            .select('name courses photo');
 
-        const students = await userModel.find({
-            role: 'student',
-            manager: req.user._id
-        }).select('name courses photo');
+        // Transformasi data courses agar menggunakan URL Cloudinary
+        const responseCourses = coursesList.map((item) => ({
+            ...item.toObject(),
+            thumbnail_url: item.thumbnail, // Thumbnail langsung dari Cloudinary
+            total_students: item.students.length
+        }));
 
-        const photoUrl = process.env.APP_URL + '/uploads/students/'
-
-        const responseStudents = students.map((item) => {
-            return {
-                ...item.toObject(),
-                photo_url: photoUrl + item.photo
-            }
-        })
-
-
-        const responseCourses = coursesList.map((item) => {
-            return {
-                ...item.toObject(),
-                thumbnail_url: imageUrl + item.thumbnail,
-                total_students: item.students.length
-            }
-        })
-
+        // Transformasi data students agar menggunakan URL Cloudinary
+        const responseStudents = students.map((item) => ({
+            ...item.toObject(),
+            photo_url: item.photo, // URL langsung dari Cloudinary
+        }));
 
         return res.json({
             message: 'Get overview success',
@@ -98,8 +74,7 @@ export const getOverviews = async (req, res) => {
         });
     } catch (error) {
         console.log(error);
-        return res.status(500).json({
-            message: 'Internal server error',
-        });
+        return res.status(500).json({ message: 'Internal server error' });
     }
 };
+

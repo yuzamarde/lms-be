@@ -1,4 +1,5 @@
 import courseModel from '../models/courseModel.js';
+import cloudinary from '../utils/cloudinary.js';
 import fs from 'fs';
 import categoryModel from '../models/categoryModel.js';
 import userModel from '../models/userModel.js';
@@ -8,40 +9,24 @@ import courseDetailModel from '../models/courseDetailModel.js';
 
 export const getCourses = async (req, res) => {
     try {
-        const courses = await courseModel.find({
-            manager: req.user?._id,
-        })
+        const courses = await courseModel.find({ manager: req.user?._id })
             .select('name thumbnail')
-            .populate({
-                path: 'category',
-                select: 'name _id',
-            })
-            .populate({
-                path: 'students',
-                select: 'name',
-            });
+            .populate({ path: 'category', select: 'name _id' })
+            .populate({ path: 'students', select: 'name' });
 
-        const imageUrl = process.env.APP_URL + '/uploads/courses/'
+        const response = courses.map((item) => ({
+            ...item.toObject(),
+            thumbnail_url: item.thumbnail, // Cloudinary URL langsung
+            total_students: item.students.length
+        }));
 
-        const response = courses.map((item) => {
-            return {
-                ...item.toObject(),
-                thumbnail_url: imageUrl + item.thumbnail,
-                total_students: item.students.length
-            }
-        })
-
-        return res.json({
-            message: 'Get Courses Success',
-            data: response,
-        });
+        return res.json({ message: 'Get Courses Success', data: response });
     } catch (error) {
         console.log(error);
-        return res.status(500).json({
-            message: 'Internal server error',
-        });
+        return res.status(500).json({ message: 'Internal server error' });
     }
 };
+
 
 export const getCategories = async (req, res) => {
     try {
@@ -62,7 +47,7 @@ export const getCategories = async (req, res) => {
 export const getCourseById = async (req, res) => {
     try {
         const { id } = req.params;
-        const { preview } = req.query
+        const { preview } = req.query;
 
         const course = await courseModel
             .findById(id)
@@ -73,7 +58,7 @@ export const getCourseById = async (req, res) => {
             .populate({
                 path: 'details',
                 select: preview === "true" ? 'title type youtubeId text' : 'title type'
-            })
+            });
 
         if (!course) {
             return res.status(404).json({
@@ -81,13 +66,11 @@ export const getCourseById = async (req, res) => {
             });
         }
 
-        const imageUrl = process.env.APP_URL + '/uploads/courses/'
-
         return res.json({
             message: 'Get Course Detail success',
             data: {
                 ...course.toObject(),
-                thumbnail_url: imageUrl + course.thumbnail
+                thumbnail_url: course.thumbnail // URL langsung dari Cloudinary
             }
         });
     } catch (error) {
@@ -97,113 +80,99 @@ export const getCourseById = async (req, res) => {
         });
     }
 };
+
 
 export const postCourse = async (req, res) => {
     try {
         const body = req.body;
 
-        console.log(req.file);
-
-        // Parse and validate the request body using the schema
+        // Validasi input
         const parse = mutateCourseSchema.safeParse(body);
-
-        // Handle validation errors
         if (!parse.success) {
-            const errorMessages = parse.error.issues.map((err) => err.message);
-
-            // Remove the uploaded file if validation fails
-            if (req?.file?.path && fs.existsSync(req.file.path)) {
-                fs.unlinkSync(req.file.path);
-            }
-
-            return res.status(500).json({
+            return res.status(400).json({
                 message: 'Error Validation',
-                data: null,
-                errors: errorMessages,
+                errors: parse.error.issues.map((err) => err.message),
             });
         }
 
-        // Check if the category exists in the database
+        // Cek apakah kategori ada
         const category = await categoryModel.findById(parse.data.categoryId);
         if (!category) {
-            return res.status(500).json({
+            return res.status(400).json({
                 message: 'Category Id not found',
             });
         }
 
-        // Create a new course instance
+        // Pastikan file ada sebelum mengaksesnya
+        if (!req.file || !req.file.path) {
+            return res.status(400).json({ message: 'Thumbnail image is required' });
+        }
+
+        // Buat course baru dengan URL Cloudinary
         const course = new courseModel({
             name: parse.data.name,
             category: category._id,
             description: parse.data.description,
             tagline: parse.data.tagline,
-            thumbnail: req.file?.filename,
+            thumbnail: req.file.path, // Simpan URL Cloudinary ke database
             manager: req.user._id,
         });
 
-        // Save the course to the database
         await course.save();
 
-        // Update the category model with the new course
-        await categoryModel.findByIdAndUpdate(category._id, {
-            $push: {
-                courses: course._id,
-            },
-        }, { new: true });
+        // Update kategori dan user
+        await categoryModel.findByIdAndUpdate(category._id, { $push: { courses: course._id } });
+        await userModel.findByIdAndUpdate(req.user._id, { $push: { courses: course._id } });
 
-        // Update the user model with the new course
-        await userModel.findByIdAndUpdate(req.user?._id, {
-            $push: {
-                courses: course._id,
-            },
-        }, { new: true });
-
-        return res.json({
-            message: 'Create Course Success',
+        return res.status(201).json({
+            success: true,
+            message: "Create Course Success",
+            course
         });
-
     } catch (error) {
         console.log(error);
-        return res.status(500).json({
-            message: 'Internal server error',
-        });
+        return res.status(500).json({ message: 'Internal server error' });
     }
 };
+
+
+
 
 export const updateCourse = async (req, res) => {
     try {
         const body = req.body;
         const courseId = req.params.id;
 
-
         console.log(req.file);
 
         // Parse and validate the request body using the schema
         const parse = mutateCourseSchema.safeParse(body);
 
-        // Handle validation errors
         if (!parse.success) {
-            const errorMessages = parse.error.issues.map((err) => err.message);
-
-            // Remove the uploaded file if validation fails
-            if (req?.file?.path && fs.existsSync(req.file.path)) {
-                fs.unlinkSync(req.file.path);
-            }
-
-            return res.status(500).json({
-                message: 'Error Validation',
-                data: null,
-                errors: errorMessages,
+            return res.status(400).json({
+                message: 'Validation Error',
+                errors: parse.error.issues.map((err) => err.message),
             });
         }
 
-        // Check if the category exists in the database
+        // Cek apakah kategori ada
         const category = await categoryModel.findById(parse.data.categoryId);
-        const oldCourse = await courseModel.findById(courseId)
+        const oldCourse = await courseModel.findById(courseId);
         if (!category) {
-            return res.status(500).json({
-                message: 'Category Id not found',
-            });
+            return res.status(400).json({ message: 'Category Id not found' });
+        }
+
+        let updatedThumbnail = oldCourse.thumbnail; // Gunakan gambar lama jika tidak ada file baru
+
+        if (req.file) {
+            // Hapus gambar lama dari Cloudinary jika ada
+            if (oldCourse.thumbnail) {
+                const publicId = oldCourse.thumbnail.split('/').pop().split('.')[0];
+                await cloudinary.uploader.destroy(`uploads/${publicId}`);
+            }
+
+            // Simpan URL Cloudinary yang baru
+            updatedThumbnail = req.file.path;
         }
 
         await courseModel.findByIdAndUpdate(
@@ -213,56 +182,44 @@ export const updateCourse = async (req, res) => {
                 category: category._id,
                 description: parse.data.description,
                 tagline: parse.data.tagline,
-                thumbnail: req?.file ? req.file?.filename : oldCourse.thumbnail,
+                thumbnail: updatedThumbnail, // Simpan URL Cloudinary baru atau gunakan yang lama
                 manager: req.user._id,
             }
         );
 
-
-
-        return res.json({
-            message: 'Update Course Success',
-        });
+        return res.json({ message: 'Update Course Success' });
 
     } catch (error) {
         console.log(error);
-        return res.status(500).json({
-            message: 'Internal server error',
-        });
+        return res.status(500).json({ message: 'Internal server error' });
     }
 };
 
 export const deleteCourse = async (req, res) => {
     try {
         const { id } = req.params;
-        // Find the course by ID
+
+        // Cari course berdasarkan ID
         const course = await courseModel.findById(id);
 
-        const dirname = path.resolve()
-
-
-
-        // Construct the file path for the course thumbnail
-        const filePath = path.join(
-            dirname, 'public/uploads/courses', course.thumbnail
-        );
-
-        // Delete the thumbnail file if it exists
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
+        if (!course) {
+            return res.status(404).json({ message: 'Course not found' });
         }
 
-        // Delete the course from the database
+        // Hapus thumbnail dari Cloudinary jika ada
+        if (course.thumbnail) {
+            const publicId = course.thumbnail.split('/').pop().split('.')[0];
+            await cloudinary.uploader.destroy(`courses/${publicId}`);
+        }
+
+        // Hapus course dari database
         await courseModel.findByIdAndDelete(id);
 
-        return res.json({
-            message: 'Delete course success',
-        });
+        return res.json({ message: 'Delete course success' });
+
     } catch (error) {
         console.log(error);
-        return res.status(500).json({
-            message: 'Internal server error',
-        });
+        return res.status(500).json({ message: 'Internal server error' });
     }
 };
 
@@ -388,33 +345,27 @@ export const getStudentsByCourseId = async (req, res) => {
             });
 
         if (!course) {
-            return res.status(404).json({
-                message: 'Course not found',
-            });
+            return res.status(404).json({ message: 'Course not found' });
         }
-        const photoUrl = process.env.APP_URL + '/uploads/students/'
 
-        const studentsMap = course?.students?.map((item) => {
-            return {
-                ...item.toObject(),
-                photo_url: photoUrl + item.photo
-            }
-        })
+        const studentsMap = course?.students?.map((item) => ({
+            ...item.toObject(),
+            photo_url: item.photo, // Sudah berupa URL dari Cloudinary
+        }));
 
         return res.json({
             message: 'Get students by course success',
             data: {
                 ...course.toObject(),
-                students: studentsMap
+                students: studentsMap,
             }
         });
     } catch (error) {
         console.log(error);
-        return res.status(500).json({
-            message: 'Internal server error',
-        });
+        return res.status(500).json({ message: 'Internal server error' });
     }
 };
+
 
 export const postStudentToCourse = async (req, res) => {
     try {
