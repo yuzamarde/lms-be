@@ -84,37 +84,44 @@ export const getCourseById = async (req, res) => {
 
 export const postCourse = async (req, res) => {
     try {
-        const body = req.body;
+        console.log("Processing new course...");
 
         // Validasi input
-        const parse = mutateCourseSchema.safeParse(body);
+        const parse = mutateCourseSchema.safeParse(req.body);
         if (!parse.success) {
             return res.status(400).json({
+                success: false,
                 message: 'Error Validation',
                 errors: parse.error.issues.map((err) => err.message),
             });
         }
 
-        // Cek apakah kategori ada
+        // Cek kategori
         const category = await categoryModel.findById(parse.data.categoryId);
         if (!category) {
             return res.status(400).json({
+                success: false,
                 message: 'Category Id not found',
             });
         }
 
-        // Pastikan file ada sebelum mengaksesnya
+        // Pastikan ada file
         if (!req.file || !req.file.path) {
-            return res.status(400).json({ message: 'Thumbnail image is required' });
+            return res.status(400).json({
+                success: false,
+                message: 'Thumbnail image is required',
+            });
         }
 
-        // Buat course baru dengan URL Cloudinary
+        console.log("Uploading file to Cloudinary...");
+
+        // Simpan data ke database
         const course = new courseModel({
             name: parse.data.name,
             category: category._id,
             description: parse.data.description,
             tagline: parse.data.tagline,
-            thumbnail: req.file.path, // Simpan URL Cloudinary ke database
+            thumbnail: req.file.path,
             manager: req.user._id,
         });
 
@@ -124,16 +131,25 @@ export const postCourse = async (req, res) => {
         await categoryModel.findByIdAndUpdate(category._id, { $push: { courses: course._id } });
         await userModel.findByIdAndUpdate(req.user._id, { $push: { courses: course._id } });
 
+        console.log("Course created successfully!");
+
+        // Kirim respons sukses agar frontend bisa menangkapnya
         return res.status(201).json({
             success: true,
             message: "Create Course Success",
             course
         });
+
     } catch (error) {
-        console.log(error);
-        return res.status(500).json({ message: 'Internal server error' });
+        console.error("Error in postCourse:", error);
+        return res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+        });
     }
 };
+
+
 
 
 
@@ -168,7 +184,7 @@ export const updateCourse = async (req, res) => {
             // Hapus gambar lama dari Cloudinary jika ada
             if (oldCourse.thumbnail) {
                 const publicId = oldCourse.thumbnail.split('/').pop().split('.')[0];
-                await cloudinary.uploader.destroy(`uploads/${publicId}`);
+                await cloudinary.uploader.destroy(`courses/${publicId}`);
             }
 
             // Simpan URL Cloudinary yang baru
